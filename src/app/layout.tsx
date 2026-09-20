@@ -12,16 +12,21 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Travel Marble",
+  title: {
+    default: "Travel Marvel",
+    template: "%s · Travel Marvel",
+  },
   description: "주사위로 떠나는 강원도 여행",
-  applicationName: "Travel Marble",
+  applicationName: "Travel Marvel",
   appleWebApp: {
     capable: true,
-    title: "Travel Marble",
+    title: "Travel Marvel",
     statusBarStyle: "default",
   },
   icons: {
-    icon: "/images/favicon.png",
+    icon: [{ url: "/images/app-icon.png", type: "image/png" }],
+    shortcut: "/images/app-icon.png",
+    apple: "/images/app-icon.png",
   },
 };
 
