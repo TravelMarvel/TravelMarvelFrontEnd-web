@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { getVisitPhoto, uploadVisitPhoto } from "@/api/photos";
 import { getSpot, type SpotDetail } from "@/api/spots";
-import { Env } from "@/constants/env";
 import { ApiError } from "@/lib/api-client";
 import { showAlert } from "@/lib/app-alert";
 
@@ -17,26 +16,6 @@ type Props = {
   userPhotoUrl?: string | null;
   onPhotoUploaded?: (imageUrl: string) => void;
 };
-
-type KakaoMaps = {
-  maps: {
-    load: (callback: () => void) => void;
-    LatLng: new (lat: number, lng: number) => object;
-    Map: new (
-      container: HTMLElement,
-      options: { center: object; level: number },
-    ) => { relayout: () => void; setCenter: (latlng: object) => void };
-    Marker: new (options: { position: object }) => {
-      setMap: (map: object | null) => void;
-    };
-  };
-};
-
-declare global {
-  interface Window {
-    kakao?: KakaoMaps;
-  }
-}
 
 function getDescription(spot: SpotDetail) {
   const raw = spot.overview?.trim() || spot.description?.trim() || "";
@@ -62,46 +41,11 @@ function hasValidCoordinates(latitude: number, longitude: number) {
   );
 }
 
-/** 카카오맵 길찾기 (목적지) */
-function getDirectionsUrl(spot: SpotDetail) {
+/** 카카오맵에서 위치 보기 */
+function getMapUrl(spot: SpotDetail) {
   const { latitude, longitude, name } = spot;
-  const label = name.trim() || "목적지";
-  return `https://map.kakao.com/link/to/${encodeURIComponent(label)},${latitude},${longitude}`;
-}
-
-let kakaoMapsScriptPromise: Promise<void> | null = null;
-
-function loadKakaoMapsSdk() {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("browser only"));
-  }
-  if (!Env.kakaoJsKey) {
-    return Promise.reject(new Error("NEXT_PUBLIC_KAKAO_JS_KEY 가 없습니다."));
-  }
-  if (window.kakao?.maps) {
-    return Promise.resolve();
-  }
-
-  kakaoMapsScriptPromise ??= new Promise<void>((resolve, reject) => {
-    const existing = document.getElementById("kakao-maps-sdk");
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () =>
-        reject(new Error("Kakao Maps SDK load failed")),
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "kakao-maps-sdk";
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${Env.kakaoJsKey}&autoload=false`;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Kakao Maps SDK load failed"));
-    document.head.appendChild(script);
-  });
-
-  return kakaoMapsScriptPromise;
+  const label = name.trim() || "장소";
+  return `https://map.kakao.com/link/map/${encodeURIComponent(label)},${latitude},${longitude}`;
 }
 
 function SpotMapPreview({
@@ -111,64 +55,16 @@ function SpotMapPreview({
   latitude: number;
   longitude: number;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const src = `/api/kakao/static-map?lat=${latitude}&lng=${longitude}`;
 
-  useEffect(() => {
-    let cancelled = false;
-    let marker: { setMap: (map: object | null) => void } | null = null;
-
-    const render = async () => {
-      setError(null);
-      try {
-        await loadKakaoMapsSdk();
-        if (cancelled || !containerRef.current || !window.kakao?.maps) return;
-
-        await new Promise<void>((resolve) => {
-          window.kakao!.maps.load(() => resolve());
-        });
-        if (cancelled || !containerRef.current) return;
-
-        const center = new window.kakao.maps.LatLng(latitude, longitude);
-        const map = new window.kakao.maps.Map(containerRef.current, {
-          center,
-          level: 3,
-        });
-        marker = new window.kakao.maps.Marker({ position: center });
-        marker.setMap(map);
-
-        // 모달 애니메이션 후 크기 보정
-        window.setTimeout(() => {
-          if (!cancelled) {
-            map.relayout();
-            map.setCenter(center);
-          }
-        }, 100);
-      } catch (err) {
-        console.warn("[spot-map] kakao preview failed:", err);
-        if (!cancelled) {
-          setError("지도를 불러오지 못했어요.");
-        }
-      }
-    };
-
-    void render();
-
-    return () => {
-      cancelled = true;
-      marker?.setMap(null);
-    };
-  }, [latitude, longitude]);
-
-  if (error) {
-    return (
-      <div className="flex h-full items-center justify-center bg-[#F5F5F7] text-[13px] text-[#9E9E9E]">
-        {error}
-      </div>
-    );
-  }
-
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt="카카오맵 미리보기"
+      className="h-full w-full object-cover"
+    />
+  );
 }
 
 export function SpotDetailModal({
@@ -265,7 +161,9 @@ export function SpotDetailModal({
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || visitId == null) return;
@@ -356,13 +254,25 @@ export function SpotDetailModal({
                 />
               ) : null}
 
-              <div>
-                <h3 className="text-[22px] font-extrabold tracking-[-0.4px] text-[#1A1A1B]">
-                  {spot.name}
-                </h3>
-                <p className="mt-1 text-[13px] font-medium text-[#9E9E9E]">
-                  📍 {spot.address}
-                </p>
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-[22px] font-extrabold tracking-[-0.4px] text-[#1A1A1B]">
+                    {spot.name}
+                  </h3>
+                  <p className="mt-1 text-[13px] font-medium text-[#9E9E9E]">
+                    📍 {spot.address}
+                  </p>
+                </div>
+                {hasLocation ? (
+                  <a
+                    href={getMapUrl(spot)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded-full bg-[#FFF3ED] px-3 py-1.5 text-[12px] font-bold text-[#F26522]"
+                  >
+                    지도표시
+                  </a>
+                ) : null}
               </div>
 
               {description ? (
@@ -372,21 +282,11 @@ export function SpotDetailModal({
               ) : null}
 
               {hasLocation ? (
-                <div className="overflow-hidden rounded-2xl">
-                  <div className="h-40 overflow-hidden bg-[#F5F5F7]">
-                    <SpotMapPreview
-                      latitude={spot.latitude}
-                      longitude={spot.longitude}
-                    />
-                  </div>
-                  <a
-                    href={getDirectionsUrl(spot)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center bg-[#FFF3ED] py-3 text-[14px] font-bold text-[#F26522]"
-                  >
-                    길찾기
-                  </a>
+                <div className="h-40 overflow-hidden rounded-2xl bg-[#F5F5F7]">
+                  <SpotMapPreview
+                    latitude={spot.latitude}
+                    longitude={spot.longitude}
+                  />
                 </div>
               ) : null}
 
@@ -412,7 +312,10 @@ export function SpotDetailModal({
                   </div>
                 ) : displayedPhotoUrl ? (
                   <div className="flex flex-col gap-2">
-                    <button type="button" onClick={() => setPreviewUrl(displayedPhotoUrl)}>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewUrl(displayedPhotoUrl)}
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={displayedPhotoUrl}
@@ -437,7 +340,9 @@ export function SpotDetailModal({
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl text-[#F26522]">
                       ＋
                     </span>
-                    <p className="text-[14px] font-bold text-[#1A1A1B]">사진 등록</p>
+                    <p className="text-[14px] font-bold text-[#1A1A1B]">
+                      사진 등록
+                    </p>
                     <p className="text-[12px] text-[#9E9E9E]">
                       이 명소에서 남긴 사진을 추가해 보세요
                     </p>
