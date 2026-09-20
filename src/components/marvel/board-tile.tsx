@@ -27,6 +27,16 @@ const TILE_COLORS: Record<
     label: "#7B6CF6",
     background: "#F0EDFF",
   },
+  DICE: {
+    border: "#2A9D8F",
+    label: "#2A9D8F",
+    background: "#E8F6F3",
+  },
+  MAP: {
+    border: "#7B6CF6",
+    label: "#7B6CF6",
+    background: "#F0EDFF",
+  },
 };
 
 type Props = {
