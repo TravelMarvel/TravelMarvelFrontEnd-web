@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getVisitPhoto, uploadVisitPhoto } from "@/api/photos";
 import { getSpot, type SpotDetail } from "@/api/spots";
+import { Env } from "@/constants/env";
 import { ApiError } from "@/lib/api-client";
 import { showAlert } from "@/lib/app-alert";
 
@@ -16,6 +17,26 @@ type Props = {
   userPhotoUrl?: string | null;
   onPhotoUploaded?: (imageUrl: string) => void;
 };
+
+type KakaoMaps = {
+  maps: {
+    load: (callback: () => void) => void;
+    LatLng: new (lat: number, lng: number) => object;
+    Map: new (
+      container: HTMLElement,
+      options: { center: object; level: number },
+    ) => { relayout: () => void; setCenter: (latlng: object) => void };
+    Marker: new (options: { position: object }) => {
+      setMap: (map: object | null) => void;
+    };
+  };
+};
+
+declare global {
+  interface Window {
+    kakao?: KakaoMaps;
+  }
+}
 
 function getDescription(spot: SpotDetail) {
   const raw = spot.overview?.trim() || spot.description?.trim() || "";
@@ -41,6 +62,48 @@ function hasValidCoordinates(latitude: number, longitude: number) {
   );
 }
 
+/** 카카오맵 길찾기 (목적지) */
+function getDirectionsUrl(spot: SpotDetail) {
+  const { latitude, longitude, name } = spot;
+  const label = name.trim() || "목적지";
+  return `https://map.kakao.com/link/to/${encodeURIComponent(label)},${latitude},${longitude}`;
+}
+
+let kakaoMapsScriptPromise: Promise<void> | null = null;
+
+function loadKakaoMapsSdk() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("browser only"));
+  }
+  if (!Env.kakaoJsKey) {
+    return Promise.reject(new Error("NEXT_PUBLIC_KAKAO_JS_KEY 가 없습니다."));
+  }
+  if (window.kakao?.maps) {
+    return Promise.resolve();
+  }
+
+  kakaoMapsScriptPromise ??= new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById("kakao-maps-sdk");
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () =>
+        reject(new Error("Kakao Maps SDK load failed")),
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "kakao-maps-sdk";
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${Env.kakaoJsKey}&autoload=false`;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Kakao Maps SDK load failed"));
+    document.head.appendChild(script);
+  });
+
+  return kakaoMapsScriptPromise;
+}
+
 function SpotMapPreview({
   latitude,
   longitude,
@@ -48,31 +111,64 @@ function SpotMapPreview({
   latitude: number;
   longitude: number;
 }) {
-  const src = useMemo(() => {
-    const html = `<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
-<style>html,body,#map{margin:0;width:100%;height:100%;background:#f5f5f7}.leaflet-control-attribution{display:none}</style>
-</head><body><div id="map"></div>
-<script>
-var map=L.map("map",{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false}).setView([${latitude},${longitude}],15);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
-L.circleMarker([${latitude},${longitude}],{radius:8,color:"#ffffff",weight:2,fillColor:"#F26522",fillOpacity:1}).addTo(map);
-<\/script></body></html>`;
-    return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let marker: { setMap: (map: object | null) => void } | null = null;
+
+    const render = async () => {
+      setError(null);
+      try {
+        await loadKakaoMapsSdk();
+        if (cancelled || !containerRef.current || !window.kakao?.maps) return;
+
+        await new Promise<void>((resolve) => {
+          window.kakao!.maps.load(() => resolve());
+        });
+        if (cancelled || !containerRef.current) return;
+
+        const center = new window.kakao.maps.LatLng(latitude, longitude);
+        const map = new window.kakao.maps.Map(containerRef.current, {
+          center,
+          level: 3,
+        });
+        marker = new window.kakao.maps.Marker({ position: center });
+        marker.setMap(map);
+
+        // 모달 애니메이션 후 크기 보정
+        window.setTimeout(() => {
+          if (!cancelled) {
+            map.relayout();
+            map.setCenter(center);
+          }
+        }, 100);
+      } catch (err) {
+        console.warn("[spot-map] kakao preview failed:", err);
+        if (!cancelled) {
+          setError("지도를 불러오지 못했어요.");
+        }
+      }
+    };
+
+    void render();
+
+    return () => {
+      cancelled = true;
+      marker?.setMap(null);
+    };
   }, [latitude, longitude]);
 
-  return (
-    <iframe
-      title="map"
-      src={src}
-      className="h-full w-full border-0"
-      sandbox="allow-scripts allow-same-origin"
-    />
-  );
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#F5F5F7] text-[13px] text-[#9E9E9E]">
+        {error}
+      </div>
+    );
+  }
+
+  return <div ref={containerRef} className="h-full w-full" />;
 }
 
 export function SpotDetailModal({
@@ -284,9 +380,9 @@ export function SpotDetailModal({
                     />
                   </div>
                   <a
-                    href={`https://map.kakao.com/link/map/${encodeURIComponent(spot.name)},${spot.latitude},${spot.longitude}`}
+                    href={getDirectionsUrl(spot)}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="flex items-center justify-center bg-[#FFF3ED] py-3 text-[14px] font-bold text-[#F26522]"
                   >
                     길찾기
