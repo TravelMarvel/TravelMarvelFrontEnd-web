@@ -19,7 +19,13 @@ export type CreateBoardRequest = {
   spotIds: number[];
 };
 
-export type BoardTileType = "START" | "TOUR" | "CARD" | "EVENT";
+export type BoardTileType =
+  | "START"
+  | "TOUR"
+  | "CARD"
+  | "EVENT"
+  | "DICE"
+  | "MAP";
 
 export type BoardTile = {
   boardTileId: number;
@@ -68,6 +74,8 @@ export const BOARD_TILE_TYPE_LABEL: Record<BoardTileType, string> = {
   TOUR: "TOUR",
   CARD: "CARD",
   EVENT: "EVENT",
+  DICE: "DICE",
+  MAP: "MAP",
 };
 
 export function getBoards() {

@@ -22,8 +22,8 @@ import { showAlert } from "@/lib/app-alert";
 
 const LEGEND: { type: BoardTileType; color: string; background: string }[] = [
   { type: "TOUR", color: "#F26522", background: "#FFF3ED" },
-  { type: "CARD", color: "#2A9D8F", background: "#E8F6F3" },
-  { type: "EVENT", color: "#7B6CF6", background: "#F0EDFF" },
+  { type: "DICE", color: "#2A9D8F", background: "#E8F6F3" },
+  { type: "MAP", color: "#7B6CF6", background: "#F0EDFF" },
 ];
 
 const ROLL_DURATION_MS = 1200;
@@ -81,9 +81,9 @@ export function MarvelBoardDetailScreen({
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
   const [selectedVisitId, setSelectedVisitId] = useState<number | null>(null);
   const [selectedUnlocked, setSelectedUnlocked] = useState(false);
-  const [visitIdBySpotId, setVisitIdBySpotId] = useState<Record<number, number>>(
-    {},
-  );
+  const [visitIdBySpotId, setVisitIdBySpotId] = useState<
+    Record<number, number>
+  >({});
   const [photoUrlBySpotId, setPhotoUrlBySpotId] = useState<
     Record<number, string>
   >({});
@@ -440,8 +440,7 @@ export function MarvelBoardDetailScreen({
           ) : (
             <>
               <span className="block text-[16px] font-bold text-[#1A1A1B]">
-                주사위 눈수:{" "}
-                <span className="text-[#F26522]">{lastRoll}</span>
+                주사위 눈수: <span className="text-[#F26522]">{lastRoll}</span>
               </span>
               <span className="block text-[13px] font-medium text-[#9E9E9E]">
                 {lastLandedName
