@@ -20,8 +20,14 @@ export async function GET(request: Request) {
   }
 
   const upstream = await fetch(parsed.toString(), {
-    headers: { Accept: "image/*,*/*" },
-    cache: "force-cache",
+    headers: {
+      Accept: "image/*,*/*;q=0.8",
+      // 일부 스토리지는 브라우저 UA 없으면 거부함
+      "User-Agent":
+        "Mozilla/5.0 (compatible; TravelMarvelWeb/1.0; +https://travelmarvel.app)",
+    },
+    cache: "no-store",
+    redirect: "follow",
   });
 
   if (!upstream.ok) {
@@ -32,12 +38,22 @@ export async function GET(request: Request) {
   }
 
   const contentType = upstream.headers.get("content-type") || "image/jpeg";
+  if (!contentType.startsWith("image/") && !contentType.includes("octet-stream")) {
+    return NextResponse.json(
+      { message: "이미지 형식이 아니에요." },
+      { status: 415 },
+    );
+  }
+
   const buffer = await upstream.arrayBuffer();
 
   return new NextResponse(buffer, {
     headers: {
-      "Content-Type": contentType,
+      "Content-Type": contentType.startsWith("image/")
+        ? contentType
+        : "image/jpeg",
       "Cache-Control": "public, max-age=3600",
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }

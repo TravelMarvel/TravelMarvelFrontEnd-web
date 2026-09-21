@@ -287,10 +287,26 @@ export function AlbumScreen() {
             setIsSelecting(true);
             setSharePhotos([]);
           }}
-          className="fixed bottom-24 right-[max(1.5rem,calc(50%-215px+1.5rem))] z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#F26522] text-2xl text-white shadow-lg"
-          aria-label="공유"
+          className="fixed bottom-24 right-[max(1.5rem,calc(50%-215px+1.5rem))] z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#333] shadow-[0_4px_16px_rgba(0,0,0,0.18)]"
+          aria-label="공유하기"
         >
-          ＋
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
         </button>
       )}
 

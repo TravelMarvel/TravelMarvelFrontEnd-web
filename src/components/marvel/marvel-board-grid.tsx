@@ -68,6 +68,10 @@ export function MarvelBoardGrid({
   }, [boardSize, onBoardWidthChange]);
 
   const cellSize = boardSize > 0 ? boardSize / 4 : 0;
+  // playRollAnimation의 travel과 동일 — 끝에서 720°(정방향)로 맞춤
+  const diceTravelMax = Math.max(boardSize - BOARD_DICE_SIZE - 8, 180);
+  const diceRotateDeg =
+    diceTravelMax > 0 ? (diceTravel / diceTravelMax) * 720 : 0;
 
   return (
     <div
@@ -130,7 +134,7 @@ export function MarvelBoardGrid({
           style={{
             top: "42%",
             marginTop: -BOARD_DICE_SIZE / 2,
-            transform: `translateX(${diceTravel}px) rotate(${(diceTravel / Math.max(boardSize, 1)) * 720}deg)`,
+            transform: `translateX(${diceTravel}px) rotate(${diceRotateDeg}deg)`,
           }}
         >
           {displayFace}

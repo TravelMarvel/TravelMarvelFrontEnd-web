@@ -41,13 +41,14 @@ function hasValidCoordinates(latitude: number, longitude: number) {
   );
 }
 
-/** 카카오맵에서 위치 보기 */
+/** 지도표시 클릭 → 카카오맵 */
 function getMapUrl(spot: SpotDetail) {
   const { latitude, longitude, name } = spot;
   const label = name.trim() || "장소";
   return `https://map.kakao.com/link/map/${encodeURIComponent(label)},${latitude},${longitude}`;
 }
 
+/** 미리보기 → Google Maps embed */
 function SpotMapPreview({
   latitude,
   longitude,
@@ -55,14 +56,18 @@ function SpotMapPreview({
   latitude: number;
   longitude: number;
 }) {
-  const src = `/api/kakao/static-map?lat=${latitude}&lng=${longitude}`;
+  const src = `https://maps.google.com/maps?q=${encodeURIComponent(
+    `${latitude},${longitude}`,
+  )}&z=15&hl=ko&output=embed`;
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <iframe
+      title="map-preview"
       src={src}
-      alt="카카오맵 미리보기"
-      className="h-full w-full object-cover"
+      className="h-full w-full border-0"
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+      allowFullScreen
     />
   );
 }
